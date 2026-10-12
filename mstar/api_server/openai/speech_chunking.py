@@ -32,7 +32,9 @@ _SOFT_BREAKS = (
 
 
 def _hard_wrap(sentence: str, max_chars: int) -> list[str]:
-    """Split one over-long sentence at clause boundaries, then at spaces."""
+    """Split one over-long sentence at clause boundaries, then at spaces, then
+    (for text with neither, such as Thai or Chinese without punctuation) every
+    ``max_chars`` characters."""
     pieces = [sentence]
     for pattern in _SOFT_BREAKS:
         wrapped: list[str] = []
@@ -53,14 +55,14 @@ def _hard_wrap(sentence: str, max_chars: int) -> list[str]:
             if current:
                 wrapped.append(current)
         pieces = wrapped
-    return pieces
+    return [p[i : i + max_chars] for p in pieces for i in range(0, len(p), max_chars)]
 
 
 def split_sentences(text: str, max_chars: int = 400, min_chars: int = 24) -> list[str]:
     """Group ``text`` into sentence chunks of at most ``max_chars`` characters.
 
     Sentences are never cut unless one alone exceeds ``max_chars`` (then it is
-    wrapped at clause boundaries, or spaces as a last resort). A trailing
+    wrapped at clause boundaries, then spaces, then by length). A trailing
     fragment shorter than ``min_chars`` is merged into its predecessor so the
     model is not asked to voice a lone "Okay." Returns ``[text]`` when nothing
     needs splitting and ``[]`` for blank input.
