@@ -56,7 +56,7 @@ def test_sentences_are_grouped_up_to_max_chars_and_never_cut():
 
 def test_cjk_terminators_and_paragraph_breaks_split():
     text = "今天天气很好。我们去公园散步吧！你觉得怎么样？\n\nSecond paragraph here."
-    chunks = split_sentences(text, max_chars=8, min_chars=1)
+    chunks = split_sentences(text, max_chars=9, min_chars=1)
     assert chunks[:3] == ["今天天气很好。", "我们去公园散步吧！", "你觉得怎么样？"]
     assert " ".join(chunks[3:]) == "Second paragraph here."
 
@@ -371,6 +371,14 @@ def test_a_client_seed_advances_per_chunk_and_wraps_at_int64():
     # the first piece keeps the client's value
     assert _chunk_kwargs({"seed": -5}, 0)["seed"] == -5
     assert "seed" not in _chunk_kwargs({"sentence_chunking": True}, 1)
+
+
+@pytest.mark.parametrize("text", ["你好" * 300, "สวัสดี" * 200, "x" * 1000])
+def test_text_with_no_break_points_is_still_cut_to_max_chars(text):
+    chunks = split_sentences(text, max_chars=400)
+    assert len(chunks) > 1
+    assert max(len(c) for c in chunks) <= 400
+    assert "".join(chunks) == text
 
 
 def test_the_adapter_maps_the_request_off_the_event_loop():
