@@ -33,7 +33,7 @@ class ChatCompletionRequest(BaseModel):
     max_tokens: int | None = None
     max_completion_tokens: int | None = None
     n: int | None = 1
-    seed: int | None = None
+    seed: int | None = Field(None, ge=-2**63, le=2**63 - 1)  # the conductor's seed is an int64
     stop: str | list[str] | None = None
     stream: bool | None = False
 
@@ -95,7 +95,7 @@ class ImageGenerationRequest(BaseModel):
     n: int | None = 1
     size: str | None = None
     response_format: str = "b64_json"
-    seed: int | None = None
+    seed: int | None = Field(None, ge=-2**63, le=2**63 - 1)  # the conductor's seed is an int64
 
 
 class VideoGenerationRequest(BaseModel):
@@ -115,7 +115,7 @@ class VideoGenerationRequest(BaseModel):
     n: int | None = 1
     size: str | None = None
     response_format: str = "b64_json"
-    seed: int | None = None
+    seed: int | None = Field(None, ge=-2**63, le=2**63 - 1)  # the conductor's seed is an int64
     num_frames: int | None = None
     fps: float | None = None
     image: str | None = None  # URL or data URI for image-to-video conditioning

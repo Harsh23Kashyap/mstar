@@ -184,6 +184,40 @@ def test_speech_seed_is_an_int64(client_and_stub, seed, status):
     assert r.status_code == status
 
 
+_SEED_ROUTES = [
+    ("/v1/chat/completions", "bagel", {"messages": [{"role": "user", "content": "hi"}]}, _Chunk("text", b"hi")),
+    ("/v1/images/generations", "bagel", {"prompt": "a cat"}, _Chunk("image", b"\x89PNGfake")),
+    ("/v1/videos/generations", "wan22", {"prompt": "a cat"}, _Chunk("video", b"\x00\x00\x00 ftypisommp4fake")),
+]
+
+
+@pytest.mark.parametrize("path,model,body,chunk", _SEED_ROUTES, ids=["chat", "images", "videos"])
+@pytest.mark.parametrize("seed,status", [(2**63 - 1, 200), (-(2**63), 200), (2**63, 422), (-(2**63) - 1, 422)])
+def test_seed_is_an_int64(client_and_stub, path, model, body, chunk, seed, status):
+    """The conductor's seed is an int64, so every endpoint refuses what speech already refuses."""
+    client, stub = client_and_stub
+    stub.model_name = model
+    stub.next_chunks = [chunk]
+    r = client.post(path, json={"model": model, **body, "seed": seed})
+    assert r.status_code == status
+    if status == 422:
+        assert stub.last_submit is None
+
+
+def test_images_n_wraps_per_image_seeds_within_int64(client_and_stub):
+    """Image i uses seed + i; a seed at the int64 top wraps instead of overflowing partway through n."""
+    client, stub = client_and_stub
+    stub.model_name = "bagel"
+    stub.next_chunks = [_Chunk("image", b"\x89PNGfake")]
+    seeds = []
+    submit = stub.submit_request
+    stub.submit_request = lambda **kw: (seeds.append(kw["model_kwargs"]["seed"]), submit(**kw))[1]
+    r = client.post("/v1/images/generations", json={"model": "bagel", "prompt": "a cat", "n": 3, "seed": 2**63 - 1})
+    assert r.status_code == 200
+    assert seeds == [2**63 - 1, 0, 1]
+    assert all(-(2**63) <= seed <= 2**63 - 1 for seed in seeds)
+
+
 def test_images(client_and_stub):
     client, stub = client_and_stub
     stub.model_name = "bagel"
