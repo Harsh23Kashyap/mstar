@@ -10,6 +10,7 @@ import asyncio
 import sys
 import tempfile
 import types
+import unicodedata
 from pathlib import Path
 
 import pytest
@@ -373,12 +374,24 @@ def test_a_client_seed_advances_per_chunk_and_wraps_at_int64():
     assert "seed" not in _chunk_kwargs({"sentence_chunking": True}, 1)
 
 
-@pytest.mark.parametrize("text", ["你好" * 300, "สวัสดี" * 200, "x" * 1000])
+@pytest.mark.parametrize(
+    "text",
+    [
+        "你好" * 300,
+        "สวัสดี" * 200,
+        "x" * 1000,
+        "x" * 410,
+        "x" * 401 + ". " + "y" * 399 + ".",
+    ],
+    ids=["cjk-600", "thai-1200", "latin-1000", "latin-410-short-leftover", "latin-401-then-sentence"],
+)
 def test_text_with_no_break_points_is_still_cut_to_max_chars(text):
     chunks = split_sentences(text, max_chars=400)
     assert len(chunks) > 1
     assert max(len(c) for c in chunks) <= 400
-    assert "".join(chunks) == text
+    assert min(len(c) for c in chunks) >= 24
+    assert not any(unicodedata.category(c[0]).startswith("M") for c in chunks)
+    assert "".join(chunks).replace(" ", "") == text.replace(" ", "")
 
 
 def test_the_adapter_maps_the_request_off_the_event_loop():

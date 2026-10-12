@@ -11,6 +11,7 @@ starts the second piece while the first is still streaming (see
 from __future__ import annotations
 
 import re
+import unicodedata
 
 # One sentence: a lazy body up to a Latin terminator (with any closing quotes
 # or brackets) that precedes whitespace or the end, a CJK terminator, a
@@ -31,10 +32,28 @@ _SOFT_BREAKS = (
 )
 
 
+def _cut_evenly(text: str, max_chars: int) -> list[str]:
+    """Near-equal pieces of at most ``max_chars``, none starting on a combining mark."""
+    pieces: list[str] = []
+    start = 0
+    while len(text) - start > max_chars:
+        left = len(text) - start
+        n = -(-left // max_chars)  # pieces still needed
+        end = cut = start + -(-left // n)
+        while cut > start and unicodedata.category(text[cut]).startswith("M"):
+            cut -= 1
+        if cut == start:  # nothing but marks: cut anyway
+            cut = end
+        pieces.append(text[start:cut])
+        start = cut
+    pieces.append(text[start:])
+    return pieces
+
+
 def _hard_wrap(sentence: str, max_chars: int) -> list[str]:
     """Split one over-long sentence at clause boundaries, then at spaces, then
-    (for text with neither, such as Thai or Chinese without punctuation) every
-    ``max_chars`` characters."""
+    (for text with neither, such as Thai or Chinese without punctuation) into
+    near-equal pieces of at most ``max_chars``."""
     pieces = [sentence]
     for pattern in _SOFT_BREAKS:
         wrapped: list[str] = []
@@ -55,7 +74,7 @@ def _hard_wrap(sentence: str, max_chars: int) -> list[str]:
             if current:
                 wrapped.append(current)
         pieces = wrapped
-    return [p[i : i + max_chars] for p in pieces for i in range(0, len(p), max_chars)]
+    return [q for p in pieces for q in (_cut_evenly(p, max_chars) if len(p) > max_chars else [p])]
 
 
 def split_sentences(text: str, max_chars: int = 400, min_chars: int = 24) -> list[str]:
